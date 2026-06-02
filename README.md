@@ -1,4 +1,4 @@
-# FIC - Freelance-In-Connect-
+# FIC - Freelance-In-Connect
 
 ## Overview
 
