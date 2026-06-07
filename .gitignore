@@ -1,0 +1,19 @@
+# ══ Variables d'environnement ══
+.env
+.env.local
+.env.production
+
+# ══ Java / Maven ══
+*/target/
+*.class
+*.jar
+*.war
+
+# ══ IDE ══
+.idea/
+*.iml
+.vscode/
+*.DS_Store
+
+# ══ Docker ══
+*/logs/

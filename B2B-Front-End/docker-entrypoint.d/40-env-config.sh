@@ -1,0 +1,16 @@
+#!/bin/sh
+set -eu
+
+API_BASE="${VITE_API_BASE_URL:-http://localhost:8280}"
+WS_BASE="${VITE_WS_BASE_URL:-$API_BASE}"
+WS_ENDPOINT="${VITE_MESSAGING_WS_ENDPOINT:-/api/messaging/v1/ws}"
+STRIPE_PUBLIC_KEY="${VITE_STRIPE_PUBLISHABLE_KEY:-}"
+
+cat > /usr/share/nginx/html/env.js <<EOF
+window.__APP_CONFIG__ = {
+  VITE_API_BASE_URL: "${API_BASE}",
+  VITE_WS_BASE_URL: "${WS_BASE}",
+  VITE_MESSAGING_WS_ENDPOINT: "${WS_ENDPOINT}",
+  VITE_STRIPE_PUBLISHABLE_KEY: "${STRIPE_PUBLIC_KEY}"
+};
+EOF

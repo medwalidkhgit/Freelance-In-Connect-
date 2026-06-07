@@ -1,0 +1,506 @@
+services:
+  frontend:
+    build: ./B2B-Front-End
+    container_name: b2b-frontend
+    ports:
+      - "${FRONTEND_PORT:-5175}:80"
+    environment:
+      VITE_API_BASE_URL: ${VITE_API_BASE_URL:-http://localhost:8280}
+      VITE_WS_BASE_URL: ${VITE_WS_BASE_URL:-http://localhost:8280}
+      VITE_MESSAGING_WS_ENDPOINT: ${VITE_MESSAGING_WS_ENDPOINT:-/api/messaging/v1/ws}
+      VITE_STRIPE_PUBLISHABLE_KEY: ${VITE_STRIPE_PUBLISHABLE_KEY:-}
+    depends_on:
+      - wso2-am
+    networks:
+      - backend
+    restart: unless-stopped
+
+  # ── WSO2 API Manager (Gateway + Management)
+  wso2-am:
+    image: wso2/wso2am:4.0.0
+    container_name: wso2-am
+    ports:
+      - "9443:9443" # Interface d'administration (Publisher/DevPortal)
+      - "8243:8243" # Passerelle HTTPS (Gateway)
+      - "8280:8280" # Passerelle HTTP (Gateway)
+    environment:
+      - NODE_IP=127.0.0.1
+    networks:
+      - backend
+    depends_on:
+      - keycloak
+    volumes:
+      - wso2am_data:/home/wso2carbon/wso2am-4.0.0/repository
+
+  # ════════════════════════════════════════════════════════
+  # INFRASTRUCTURE
+  # ════════════════════════════════════════════════════════
+
+  # ── Keycloak DB ─────────────────────────────────────────
+  postgres-keycloak:
+    image: postgres:15
+    container_name: postgres-keycloak
+    environment:
+      POSTGRES_DB: keycloak_db
+      POSTGRES_USER: keycloak_user
+      POSTGRES_PASSWORD: ${POSTGRES_KEYCLOAK_PASSWORD:-keycloak_secret}
+    volumes:
+      - postgres_keycloak_data:/var/lib/postgresql/data
+    networks:
+      - backend
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U keycloak_user"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+
+  keycloak:
+    image: quay.io/keycloak/keycloak:24.0.1
+    container_name: keycloak
+    command: start-dev --import-realm
+    environment:
+      KC_DB: postgres
+      KC_DB_URL: jdbc:postgresql://postgres-keycloak:5432/keycloak_db
+      KC_DB_USERNAME: keycloak_user
+      KC_DB_PASSWORD: ${POSTGRES_KEYCLOAK_PASSWORD:-keycloak_secret}
+      KEYCLOAK_ADMIN: admin
+      KEYCLOAK_ADMIN_PASSWORD: ${KEYCLOAK_ADMIN_PASSWORD:-admin123}
+      KC_HTTP_PORT: 8080
+      KC_HEALTH_ENABLED: "true"
+      KC_HOSTNAME: localhost
+      KC_HOSTNAME_STRICT: "false"
+    volumes:
+      - ./keycloak/realm-export.json:/opt/keycloak/data/import/realm-export.json:ro
+    ports:
+      - "8080:8080"
+    depends_on:
+      postgres-keycloak:
+        condition: service_healthy
+    networks:
+      - backend
+
+  # ════════════════════════════════════════════════════════
+  # BASES DE DONNÉES — UNE PAR SERVICE
+  # ════════════════════════════════════════════════════════
+
+  postgres-freelancer:
+    image: postgres:15
+    container_name: postgres-freelancer
+    environment:
+      POSTGRES_DB: freelancer_db
+      POSTGRES_USER: postgres
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:-fifa2014}
+    volumes:
+      - postgres_freelancer_data:/var/lib/postgresql/data
+    ports:
+      - "5433:5432"
+    networks:
+      - backend
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U postgres"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+
+  postgres-company:
+    image: postgres:15
+    container_name: postgres-company
+    environment:
+      POSTGRES_DB: company_db
+      POSTGRES_USER: postgres
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:-fifa2014}
+    volumes:
+      - postgres_company_data:/var/lib/postgresql/data
+    ports:
+      - "5436:5432"
+    networks:
+      - backend
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U postgres"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+
+  postgres-mission:
+    image: postgres:15
+    container_name: postgres-mission
+    environment:
+      POSTGRES_DB: mission_db
+      POSTGRES_USER: postgres
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:-fifa2014}
+    volumes:
+      - postgres_mission_data:/var/lib/postgresql/data
+    ports:
+      - "5435:5432"
+    networks:
+      - backend
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U postgres"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+
+  postgres-application:
+    image: postgres:15
+    container_name: postgres-application
+    environment:
+      POSTGRES_DB: application_db
+      POSTGRES_USER: application_user
+      POSTGRES_PASSWORD: ${APPLICATION_DB_PASSWORD:-fifa2014}
+    volumes:
+      - postgres_application_data:/var/lib/postgresql/data
+    networks:
+      - backend
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U application_user"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+
+  postgres-admin:
+    image: postgres:15
+    container_name: postgres-admin
+    environment:
+      POSTGRES_DB: admin_db
+      POSTGRES_USER: postgres
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:-fifa2014}
+    volumes:
+      - postgres_admin_data:/var/lib/postgresql/data
+    ports:
+      - "5434:5432"
+    networks:
+      - backend
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U postgres"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+
+  postgres-payment:
+    image: postgres:15
+    container_name: postgres-payment
+    environment:
+      POSTGRES_DB: payment_db
+      POSTGRES_USER: payment_user
+      POSTGRES_PASSWORD: ${PAYMENT_DB_PASSWORD:-fifa2014}
+    volumes:
+      - postgres_payment_data:/var/lib/postgresql/data
+    networks:
+      - backend
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U payment_user"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+
+  postgres-scoring:
+    image: postgres:15
+    container_name: postgres-scoring
+    profiles: ["future"]
+    environment:
+      POSTGRES_DB: scoring_db
+      POSTGRES_USER: scoring_user
+      POSTGRES_PASSWORD: scoring_secret
+    volumes:
+      - postgres_scoring_data:/var/lib/postgresql/data
+    networks:
+      - backend
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U scoring_user"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+
+  postgres-assessment:
+    image: postgres:15
+    container_name: postgres-assessment
+    profiles: ["future"]
+    environment:
+      POSTGRES_DB: assessment_db
+      POSTGRES_USER: assessment_user
+      POSTGRES_PASSWORD: assessment_secret
+    volumes:
+      - postgres_assessment_data:/var/lib/postgresql/data
+    networks:
+      - backend
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U assessment_user"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+
+  # messaging-service → MongoDB (pas PostgreSQL)
+  mongodb-messaging:
+    image: mongo:7
+    container_name: mongodb-messaging
+    environment:
+      MONGO_INITDB_ROOT_USERNAME: messaging_user
+      MONGO_INITDB_ROOT_PASSWORD: ${MESSAGING_DB_PASSWORD:-messaging_secret}
+      MONGO_INITDB_DATABASE: messaging_db
+    volumes:
+      - mongodb_messaging_data:/data/db
+    ports:
+      - "27017:27017"
+    networks:
+      - backend
+    healthcheck:
+      test: ["CMD", "mongosh", "--quiet", "--eval", "db.runCommand({ ping: 1 })"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+
+  # ════════════════════════════════════════════════════════
+  # MICROSERVICES — PHASE 1
+  # ════════════════════════════════════════════════════════
+  auth-service:
+    build: ./auth-service
+    container_name: auth-service
+    expose:
+      - "8081"
+    environment:
+      KEYCLOAK_URL: http://keycloak:8080
+      KEYCLOAK_REALM: b2b-platform
+      # Variables pour le client d'administration (auth-service)
+      KEYCLOAK_ADMIN_CLIENT_ID: auth-service # Renommé
+      KEYCLOAK_ADMIN_CLIENT_SECRET: ${AUTH_SERVICE_CLIENT_SECRET:?AUTH_SERVICE_CLIENT_SECRET is required}
+
+      # Variables pour le client utilisateur (b2b-app-client)
+      KEYCLOAK_USER_CLIENT_ID: b2b-app-client
+      KEYCLOAK_USER_CLIENT_SECRET: ${B2B_APP_CLIENT_SECRET:?B2B_APP_CLIENT_SECRET is required} # <<< NOUVELLE VARIABLE D'ENVIRONNEMENT ICI
+      INTERNAL_SERVICE_TOKEN: ${INTERNAL_SERVICE_TOKEN:?INTERNAL_SERVICE_TOKEN is required}
+      SMTP_ENABLED: ${SMTP_ENABLED:-false}
+      APP_DEV_OTP_ENABLED: ${APP_DEV_OTP_ENABLED:-true}
+      SMTP_HOST: ${SMTP_HOST:-localhost}
+      SMTP_PORT: ${SMTP_PORT:-1025}
+      SMTP_USERNAME: ${SMTP_USERNAME:-}
+      SMTP_PASSWORD: ${SMTP_PASSWORD:-}
+      SMTP_FROM: ${SMTP_FROM:-no-reply@fic.local}
+      SMTP_AUTH: ${SMTP_AUTH:-false}
+      SMTP_STARTTLS: ${SMTP_STARTTLS:-false}
+      OTP_TTL_MINUTES: ${OTP_TTL_MINUTES:-10}
+    depends_on:
+      keycloak:
+        condition: service_started
+      freelancer-service:
+        condition: service_started
+      company-service:
+        condition: service_started
+    networks:
+      - backend
+    restart: unless-stopped
+  freelancer-service:
+    build: ./freelancer-service
+    container_name: freelancer-service
+    expose:
+      - "8082"
+    environment:
+      SPRING_DATASOURCE_URL: jdbc:postgresql://postgres-freelancer:5432/freelancer_db
+      SPRING_DATASOURCE_USERNAME: postgres
+      SPRING_DATASOURCE_PASSWORD: ${POSTGRES_PASSWORD:-fifa2014}
+      KEYCLOAK_URL: http://keycloak:8080
+      KEYCLOAK_ISSUER_URL: http://localhost:8080
+      KEYCLOAK_JWK_SET_URI: http://keycloak:8080/realms/b2b-platform/protocol/openid-connect/certs
+      KEYCLOAK_REALM: b2b-platform
+      INTERNAL_SERVICE_TOKEN: ${INTERNAL_SERVICE_TOKEN:?INTERNAL_SERVICE_TOKEN is required}
+      PAYMENT_SERVICE_BASE_URL: http://payment-service:8088
+      AUTH_SERVICE_URL: http://auth-service:8081
+      APPLICATION_SERVICE_URL: http://application-service:8085
+    depends_on:
+      keycloak:
+        condition: service_started
+      postgres-freelancer:
+        condition: service_healthy
+    networks:
+      - backend
+
+  company-service:
+    build: ./company-service
+    container_name: company-service
+    expose:
+      - "8083"
+    environment:
+      SPRING_DATASOURCE_URL: jdbc:postgresql://postgres-company:5432/company_db
+      SPRING_DATASOURCE_USERNAME: postgres
+      SPRING_DATASOURCE_PASSWORD: ${POSTGRES_PASSWORD:-fifa2014}
+      KEYCLOAK_URL: http://keycloak:8080
+      KEYCLOAK_ISSUER_URL: http://localhost:8080
+      KEYCLOAK_JWK_SET_URI: http://keycloak:8080/realms/b2b-platform/protocol/openid-connect/certs
+      KEYCLOAK_REALM: b2b-platform
+      INTERNAL_SERVICE_TOKEN: ${INTERNAL_SERVICE_TOKEN:?INTERNAL_SERVICE_TOKEN is required}
+      AUTH_SERVICE_URL: http://auth-service:8081
+    depends_on:
+      keycloak:
+        condition: service_started
+      postgres-company:
+        condition: service_healthy
+    networks:
+      - backend
+
+  mission-service:
+    build: ./mission-service
+    container_name: mission-service
+    expose:
+      - "8084"
+    environment:
+      SPRING_DATASOURCE_URL: jdbc:postgresql://postgres-mission:5432/mission_db
+      SPRING_DATASOURCE_USERNAME: postgres
+      SPRING_DATASOURCE_PASSWORD: ${POSTGRES_PASSWORD:-fifa2014}
+      KEYCLOAK_URL: http://keycloak:8080
+      KEYCLOAK_ISSUER_URL: http://localhost:8080
+      KEYCLOAK_JWK_SET_URI: http://keycloak:8080/realms/b2b-platform/protocol/openid-connect/certs
+      KEYCLOAK_REALM: b2b-platform
+      INTERNAL_SERVICE_TOKEN: ${INTERNAL_SERVICE_TOKEN:?INTERNAL_SERVICE_TOKEN is required}
+      PAYMENT_SERVICE_BASE_URL: http://payment-service:8088
+    depends_on:
+      keycloak:
+        condition: service_started
+      postgres-mission:
+        condition: service_healthy
+    networks:
+      - backend
+
+  application-service:
+    build: ./application-service
+    container_name: application-service
+    expose:
+      - "8085"
+    environment:
+      SPRING_DATASOURCE_URL: jdbc:postgresql://postgres-application:5432/application_db
+      SPRING_DATASOURCE_USERNAME: application_user
+      SPRING_DATASOURCE_PASSWORD: ${APPLICATION_DB_PASSWORD:-fifa2014}
+      SPRING_JPA_DATABASE_PLATFORM: org.hibernate.dialect.PostgreSQLDialect
+      INTERNAL_SERVICE_TOKEN: ${INTERNAL_SERVICE_TOKEN:?INTERNAL_SERVICE_TOKEN is required}
+      KEYCLOAK_URL: http://keycloak:8080
+      KEYCLOAK_ISSUER_URL: http://localhost:8080
+      KEYCLOAK_JWK_SET_URI: http://keycloak:8080/realms/b2b-platform/protocol/openid-connect/certs
+      KEYCLOAK_REALM: b2b-platform
+      MESSAGING_SERVICE_URL: http://messaging-service:8087
+    depends_on:
+      keycloak:
+        condition: service_started
+      postgres-application:
+        condition: service_healthy
+    networks:
+      - backend
+
+  # ════════════════════════════════════════════════════════
+  # MICROSERVICES — PHASE 2
+  # ════════════════════════════════════════════════════════
+
+  admin-service:
+    build: ./admin-service
+    container_name: admin-service
+    expose:
+      - "8086"
+    environment:
+      SPRING_DATASOURCE_URL: jdbc:postgresql://postgres-admin:5432/admin_db
+      SPRING_DATASOURCE_USERNAME: postgres
+      SPRING_DATASOURCE_PASSWORD: ${POSTGRES_PASSWORD:-fifa2014}
+      KEYCLOAK_URL: http://keycloak:8080
+      KEYCLOAK_ISSUER_URL: http://localhost:8080
+      KEYCLOAK_JWK_SET_URI: http://keycloak:8080/realms/b2b-platform/protocol/openid-connect/certs
+      KEYCLOAK_REALM: b2b-platform
+      INTERNAL_SERVICE_TOKEN: ${INTERNAL_SERVICE_TOKEN:?INTERNAL_SERVICE_TOKEN is required}
+    depends_on:
+      keycloak:
+        condition: service_started
+      postgres-admin:
+        condition: service_healthy
+    networks:
+      - backend
+
+  messaging-service:
+    build: ./messaging-service
+    container_name: messaging-service
+    expose:
+      - "8087"
+    environment:
+      SPRING_DATA_MONGODB_URI: mongodb://messaging_user:${MESSAGING_DB_PASSWORD:-messaging_secret}@mongodb-messaging:27017/messaging_db?authSource=admin
+      KEYCLOAK_URL: http://keycloak:8080
+      KEYCLOAK_ISSUER_URL: http://localhost:8080
+      KEYCLOAK_JWK_SET_URI: http://keycloak:8080/realms/b2b-platform/protocol/openid-connect/certs
+      KEYCLOAK_REALM: b2b-platform
+      INTERNAL_SERVICE_TOKEN: ${INTERNAL_SERVICE_TOKEN:?INTERNAL_SERVICE_TOKEN is required}
+      WS_ALLOWED_ORIGINS: "*"
+      APP_SECURITY_ENABLED: "true"
+    depends_on:
+      mongodb-messaging:
+        condition: service_healthy   # ← était service_started, maintenant service_healthy
+      keycloak:
+        condition: service_started
+    networks:
+      - backend
+    restart: on-failure
+
+  # ════════���═══════════════════════════════════════════════
+  # MICROSERVICES — PHASE 3
+  # ════════════════════════════════════════════════════════
+
+  payment-service:
+    build: ./payment-service
+    container_name: payment-service
+    expose:
+      - "8088"
+    environment:
+      SPRING_DATASOURCE_URL: jdbc:postgresql://postgres-payment:5432/payment_db
+      SPRING_DATASOURCE_USERNAME: payment_user
+      SPRING_DATASOURCE_PASSWORD: ${PAYMENT_DB_PASSWORD:-fifa2014}
+      STRIPE_SECRET_KEY: ${STRIPE_SECRET_KEY:?STRIPE_SECRET_KEY is required}
+      STRIPE_WEBHOOK_SECRET: ${STRIPE_WEBHOOK_SECRET:?STRIPE_WEBHOOK_SECRET is required}
+      STRIPE_FEE_PERCENT: ${STRIPE_FEE_PERCENT:-10}
+      STRIPE_DEFAULT_CURRENCY: ${STRIPE_DEFAULT_CURRENCY:-mad}
+      STRIPE_ACCOUNT_LINK_REFRESH_URL: ${STRIPE_ACCOUNT_LINK_REFRESH_URL:-http://localhost:5173/freelancer}
+      STRIPE_ACCOUNT_LINK_RETURN_URL: ${STRIPE_ACCOUNT_LINK_RETURN_URL:-http://localhost:5173/freelancer}
+      INTERNAL_SERVICE_TOKEN: ${INTERNAL_SERVICE_TOKEN:?INTERNAL_SERVICE_TOKEN is required}
+      KEYCLOAK_URL: http://keycloak:8080
+      KEYCLOAK_ISSUER_URL: http://localhost:8080
+      KEYCLOAK_JWK_SET_URI: http://keycloak:8080/realms/b2b-platform/protocol/openid-connect/certs
+      KEYCLOAK_REALM: b2b-platform
+    depends_on:
+      postgres-payment:
+        condition: service_healthy
+      keycloak:
+        condition: service_started
+    networks:
+      - backend
+
+  media-service:
+    build: ./media-service
+    container_name: media-service
+    expose:
+      - "8089"
+    environment:
+      AZURE_STORAGE_CONNECTION_STRING: ${AZURE_STORAGE_CONNECTION_STRING:?AZURE_STORAGE_CONNECTION_STRING is required}
+      AZURE_STORAGE_PROFILE_PICTURES_CONTAINER: ${AZURE_STORAGE_PROFILE_PICTURES_CONTAINER:-profile-pictures}
+      AZURE_STORAGE_COMPANY_LOGOS_CONTAINER: ${AZURE_STORAGE_COMPANY_LOGOS_CONTAINER:-company-logos}
+      AZURE_STORAGE_CVS_CONTAINER: ${AZURE_STORAGE_CVS_CONTAINER:-cvs}
+      KEYCLOAK_URL: http://keycloak:8080
+      KEYCLOAK_ISSUER_URL: http://localhost:8080
+      KEYCLOAK_JWK_SET_URI: http://keycloak:8080/realms/b2b-platform/protocol/openid-connect/certs
+      KEYCLOAK_REALM: b2b-platform
+    depends_on:
+      keycloak:
+        condition: service_started
+    networks:
+      - backend
+
+# ════════════════════════════════════════════════════════
+# RÉSEAU & VOLUMES
+# ════════════════════════════════════════════════════════
+
+networks:
+  backend:
+    driver: bridge
+
+volumes:
+  postgres_keycloak_data:
+  postgres_freelancer_data:
+  postgres_company_data:
+  postgres_mission_data:
+  postgres_application_data:
+  postgres_admin_data:
+  postgres_payment_data:
+  postgres_scoring_data:
+  postgres_assessment_data:
+  mongodb_messaging_data:
+  wso2am_data:

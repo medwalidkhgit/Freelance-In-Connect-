@@ -1,0 +1,34 @@
+spring:
+  application:
+    name: application-service
+  datasource:
+    url: ${SPRING_DATASOURCE_URL:jdbc:h2:mem:application_db}
+    username: ${SPRING_DATASOURCE_USERNAME:sa}
+    password: ${SPRING_DATASOURCE_PASSWORD:}
+  jpa:
+    hibernate:
+      ddl-auto: update
+    database-platform: ${SPRING_JPA_DATABASE_PLATFORM:org.hibernate.dialect.H2Dialect}
+    show-sql: true
+  security:
+    oauth2:
+      resourceserver:
+        jwt:
+          issuer-uri: ${KEYCLOAK_ISSUER_URL:${KEYCLOAK_URL:http://localhost:8080}}/realms/${KEYCLOAK_REALM:b2b-platform}
+          jwk-set-uri: ${KEYCLOAK_JWK_SET_URI:${KEYCLOAK_URL:http://localhost:8080}/realms/${KEYCLOAK_REALM:b2b-platform}/protocol/openid-connect/certs}
+
+server:
+  port: 8085
+
+services:
+  mission:
+    url: ${MISSION_SERVICE_URL:http://mission-service:8084}
+  freelancer:
+    url: ${FREELANCER_SERVICE_URL:http://freelancer-service:8082}
+  company:
+    url: ${COMPANY_SERVICE_URL:http://company-service:8083}
+  messaging:
+    url: ${MESSAGING_SERVICE_URL:http://messaging-service:8087}
+
+internal:
+  service-token: ${INTERNAL_SERVICE_TOKEN:}
